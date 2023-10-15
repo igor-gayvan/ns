@@ -17,12 +17,13 @@ class StreamingConsumerApp:
         self.bootstrap_servers = self.conf.get_string('kafka.bootstrap.servers', None)
         self.kafka_topic = self.conf.get_string('kafka.topic', None)
         self.starting_offsets = self.conf.get_string('kafka.startingOffsets', None)
-        self.s3_raw_zone_path = self.conf.get_string('s3.raw-zone-path', None)
+        self.hdfs_raw_zone_path = self.conf.get_string('hdfs.raw-zone-path', None)
         self.checkpoint_location = self.conf.get_string('checkpoint.location', None)
 
         self.parse_xml_udf = udf(parse_xml, StringType())
 
-        if not all([self.bootstrap_servers, self.kafka_topic, self.starting_offsets, self.s3_raw_zone_path, self.checkpoint_location]):
+        if not all([self.bootstrap_servers, self.kafka_topic, self.starting_offsets, self.hdfs_raw_zone_path,
+                    self.checkpoint_location]):
             self.logger.error("Required configuration not found in config file!")
             raise ValueError("Missing configuration data")
 
@@ -39,15 +40,14 @@ class StreamingConsumerApp:
             .option("startingOffsets", self.starting_offsets) \
             .load()
 
-        # Add a timestamp column to your stream if not already present
+        # Add a timestamp column
         stream_with_timestamp = stream.withColumn("processing_time", current_timestamp())
 
         return stream_with_timestamp
 
     def process_kafka_stream(self, kafka_df):
-        # Use the watermarking
         kafka_df_with_watermark = kafka_df \
-            .withWatermark("processing_time", "1 hour")  # 1 hour watermark delay, adjust as necessary
+            .withWatermark("processing_time", "1 hour")
 
         processed_df = kafka_df_with_watermark.selectExpr("CAST(value AS STRING)") \
             .withColumn("xml_content", self.parse_xml_udf("value")) \
@@ -56,7 +56,7 @@ class StreamingConsumerApp:
 
         return processed_df
 
-    def kafka_to_s3(self):
+    def kafka_to_hdfs(self):
         try:
             kafka_df = self.get_kafka_stream()
             processed_df = self.process_kafka_stream(kafka_df)
@@ -68,21 +68,21 @@ class StreamingConsumerApp:
                             .withColumn("day", dayofmonth("processing_time"))
                             .withColumn("hour", hour("processing_time")))
 
-            # Streaming to S3 with checkpointing for fault tolerance
+            # Streaming to HDFS with checkpointing for fault tolerance
             query = (processed_df.writeStream
                      .format("parquet")
-                     .outputMode("overwrite")  # overwrite existing data
-                     .option("path", self.s3_raw_zone_path)
+                     .outputMode("overwrite")
+                     .option("path", self.hdfs_raw_zone_path)
                      .option("checkpointLocation", self.checkpoint_location)
-                     .partitionBy("year", "month", "day", "hour")  # partition data by year, month, day, hour
+                     .partitionBy("year", "month", "day", "hour")
                      .start())
 
             query.awaitTermination()
-            self.logger.info("Data from Kafka written to S3 RAW zone successfully!")
+            self.logger.info("Data from Kafka written to HDFS RAW zone successfully!")
         except Exception as e:
             self.logger.error(f"An error occurred: {e}")
 
 
 if __name__ == "__main__":
     app = StreamingConsumerApp()
-    app.kafka_to_s3()
+    app.kafka_to_hdfs()
