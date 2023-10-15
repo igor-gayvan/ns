@@ -1,51 +1,45 @@
-# Spark Technical Interview: Structured Streaming with Kafka and HDFS
+# Spark Batch Processor Application
 
-## Exercise Overview:
-In the subsequent interview, we would delve deep into a use case to understand the approach for building a simple streaming application. Please note, we don't expect a fully functional code but a comprehensive pseudo code to understand your approach.
+This application processes data from a RAW zone to a Processed zone using Spark, while addressing potential issues with small files.
 
-### Use Case Description:
-1. **Stream Creation**:
-   - Develop a Spark Structured Streaming application (either in Python or Scala) to publish some sample data to Kafka.
-  
-2. **Data Consumption and Storage**:
-   - Utilize Spark Structured Streaming (Python or Scala) to read the published data from Kafka.
-   - Store this consumed data as Parquet files in HDFS within a designated RAW Zone. You may use a sample XML with nested elements for this task.
-  
-3. **Data Processing**:
-   - Implement an Hourly scheduled Spark Batch process to read from the RAW Zone.
-   - Store the processed data as Parquet files in a separate location, termed as the Processed Zone.
+## Description
 
-### Output Requirements:
-- **Project Organization**:
-  - Provide a conceptual project folder structure illustrating the organization of scripts, logs, and other relevant files.
-  
-- **Pseudo Code**:
-  - Design sample scripts representing the tasks mentioned in the use case description. These scripts should be pseudo code.
-  
-- **Key Functionalities**:
-  - Kafka Consumption:
-    - Offset maintenance.
-    - Data de-duplication.
-  - XML Parsing:
-    - Flatten nested XML structures.
-  - Data Validation:
-    - Dynamic data validation.
-    - Schema validation.
-    - Data type validation.
-    - Data formatting (like trimming).
-  - Fault Tolerance:
-    - Comprehensive error handling.
-    - Continuous streaming without interruptions.
-    - Checkpoint restarts from a specific point.
-  - Data Partitioning:
-    - Partition the final Parquet data in the Processed Zone based on a date field.
+- The application reads data from specific partitions in the RAW zone, corresponding to today's date.
+- It performs schema validation, type validation, and formatting.
+- To avoid the small files problem, the application coalesces the data into a reasonable number of files before writing to the destination.
+- The processed data is then written to the Processed zone, partitioned by date.
 
-## What We Expect:
-1. The primary expectation is to see pseudo code.
-2. During our next meeting, we'd like you to present:
-   - The main shell script used to submit the Spark job.
-   - The Spark program (Python/Scala).
-3. Please feel free to refer to GitHub, Google, official Spark documentation, or any other relevant resources to guide your approach.
-4. We're mainly interested in your approach. During the interview, a code walk-through will help us understand your choices regarding functions/methods and the reasoning behind them.
+## Pre-requisites
 
-**Note**: Please don't hesitate to reach out if you have any questions or need clarifications on the exercise.
+- Apache Spark
+- Python 3.x
+- pyhocon (for configuration parsing)
+- Logging module (for logging operations)
+
+## Configuration
+
+The application requires a configuration file (`application.conf`) with the following parameters:
+
+- `s3.raw-zone-path`: The path to the RAW zone where the data is read from.
+- `s3.processed-zone-path`: The path to the Processed zone where the data will be written to.
+- `data.xml_schema`: The schema for XML validation.
+
+Ensure these configurations are correctly set before running the application.
+
+## Usage
+
+To run the Batch Processor Application:
+`python BatchProcessorApp.py`
+
+
+## Logging
+The application logs its operations, which can be helpful for troubleshooting and monitoring. The logs are saved to logs/batch_processor_app.log.
+
+## Note
+Adjust the number of partitions in the coalesce method based on the typical size of your data and your specific requirements to efficiently handle the small files problem.
+
+## Contributors
+Ihor Haivan
+
+## License
+This project is licensed under the MIT License - see the LICENSE.md file for details.
